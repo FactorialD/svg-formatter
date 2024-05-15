@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@neplex/vectorizer": "^0.0.4",
+    "canvas": "^2.11.2",
+    "fs": "^0.0.1-security",
+    "node-constants": "^0.0.2",
+    "path": "^0.12.7",
+    "potrace": "^2.1.8",
+    "svg-png-converter": "^0.0.9",
+    "xml2js": "^0.6.2"
+  }
+}
