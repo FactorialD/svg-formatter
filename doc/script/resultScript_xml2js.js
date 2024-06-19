@@ -24,7 +24,8 @@ function minimizeSVG(svgContent, file) {
     const svg = result.svg;
 	let styleMap = null;
     // Handle <style> tag
-    if (svg.style) {
+	// Записує всі стилі в мапу
+    if (svg?.style) {
       const styles = svg.style[0].trim().split('}');
       styleMap = styles.map(style => {
         const [key, value] = style.trim().split('{');
@@ -38,6 +39,7 @@ function minimizeSVG(svgContent, file) {
       console.log('Obtained style map:', styleMap);
 
       // Apply styles to corresponding elements
+	  //І потім записує значення стилю до потрібних елементів
       styleMap.forEach(({ key, value }) => {
         const elements = svg[key];
         if (elements) {
@@ -48,10 +50,11 @@ function minimizeSVG(svgContent, file) {
         }
       });
 
+		//після чого видаляє таблицю стилів
       delete svg.style;
     }
 
-    // Remove unnecessary tags
+    // Видаляємо непотрібні теги
     const unnecessaryTags = ['xml', 'g', '?xml','!DOCTYPE'];
     unnecessaryTags.forEach(tag => {
       if (svg[tag]) {
@@ -66,7 +69,7 @@ function minimizeSVG(svgContent, file) {
     });
 
 	const comments = [];
-    // Remove comment nodes
+    // Видаляємо коментарі
     function removeCommentNodes(node) {
 		if (typeof node === 'string') {
 			const trimmedNode = node.trim();
@@ -87,8 +90,8 @@ function minimizeSVG(svgContent, file) {
 	console.log('Comments:', comments);
 	
 	// If svg hasnt witdh and height attribute, add it from attribute viewBox, else set to 1200
-	if ((!svg.$.width || !svg.$.height ) && svg.$.viewBox){
-		const viewBoxValues = svg.$.viewBox.split(' ');
+	if ((!svg.$?.width || !svg.$?.height ) && svg.$?.viewBox){
+		const viewBoxValues = svg.$?.viewBox.split(' ');
 		svg.$.width = viewBoxValues[2] - viewBoxValues[0];
 		svg.$.height = viewBoxValues[3] - viewBoxValues[1];
 	} else {
@@ -96,53 +99,26 @@ function minimizeSVG(svgContent, file) {
 		svg.$.height = 1200;
 	}
 	
-	// Remove attributes
-	if(svg.$.id){
+	// Видаляємо лишні атрибути основного тегу
+	if(svg.$?.id){
 		svg.$.id = null;
 	}
-	if(svg.$.xmlns){
+	if(svg.$?.xmlns){
 		svg.$.xmlns = null;
 	}
-	if(svg.$.viewBox){
+	if(svg.$?.viewBox){
 		svg.$.viewBox = null;
 	}
 	
-    if (svg.path) {
-		
+    if (svg?.path) {
+		// обробляємо шейпи
       svg.path.forEach((path, index) => {
-		//get path fill color (style="fill:#75bae7;")
-		const styleElements = path.$?.style?.split(';') ?? []; // fill:#75bae7
-		const fillElement = styleElements.filter((elem) => elem.includes('fill:'))[0] ?? ''; // fill:#75bae7
-		const fillColor = fillElement.replace('fill:#', ''); // 75bae7
-		//console.log(`style data is ${path.$?.style} Style elements is ${styleElements} fill color is ${fillColor}`);  
+		// додаємо атрибут айді до шейпу
         path.$.id = `${index + 1}`;
         console.log(`Added id="${index + 1}" attribute to <path> tag`);
-
-		// If color is white, then set it to almost white (developer requirement!)
-        if (fillColor === 'white' || fillColor === '#FFFFFF') {
-          console.log('Changing color attribute to #FFFFFE for <path> tag');
-		  const newStyle = styleElements.filter((elem) => !elem.includes('fill:')).join(';') + ';fill:#FFFFFE';
-        }
-
-		// All strokes must be black only (developer requirement!)
-        if (path.$.stroke) {
-          console.log('Set stroke="black" attribute for <path> tag');
-          path.$.stroke = 'black';
-        }
-		
-		// If fill is almost black then set it to black
-		if(!Number.isNaN(parseInt(fillColor,16))){
-			//console.log(`color blackness: ${parseInt(fillColor,16)} - ${(16777215 - parseInt(fillColor,16))/16777215} %`);
-			if((16777215 - parseInt(fillColor,16))/16777215 > 0.94){
-				console.log(`Setting fill color from ${fillColor} to full black`);
-				const newStyle = styleElements.filter((elem) => !elem.includes('fill:')).join(';') + ';fill:#000000';
-				
-			}  // #040404 = 16514043
-		}
-		
-		
-
-        const classValue = path.$.class;
+		  
+		// якщо в шейпі є клас, то дістаємо дані про нього з мапи і записуємо в стилі шейпу 
+		const classValue = path.$.class;
         if (classValue) {
           const style = styleMap?.find(({ key }) => key === classValue.trim());
           if (style) {
@@ -150,6 +126,61 @@ function minimizeSVG(svgContent, file) {
             path.$[style.value.attrName] = style.value.attrValue;
           }
         }
+		  
+		//Якщо шейп має атрибут стилю
+		if(path.$?.style){
+		  //дістаємо звідти всі стилі і записуємо їх в атрибути
+		  const styleElements = path.$?.style?.split(';').map((word) => word.trim()) ?? []; // fill:#75bae7
+		  styleElements.forEach((styleElement) => {
+			  const [styleElementName, styleElementValue] = styleElement.split(':').map((word) => word.trim());
+			  path.$.styleElementName = styleElementValue;
+		  })
+		  
+		  // видаляємо атрибут стилю
+		  path.$.style = null;
+		}
+		
+		//Якщо в шейпі є атрибут fill
+		if(path.$?.fill){
+			
+			let fillColor = path.$?.fill; 
+			let newFillColor = path.$?.fill; 
+			console.log(`current fill color: ${fillColor}`);
+			// If color is white, then set it to almost white (developer requirement!)
+            if (fillColor === 'white' || fillColor === '#FFFFFF') {
+              console.log('Changing color attribute to #FFFFFE for <path> tag');
+			  newFillColor = '#FFFFFE';
+            }
+			
+			// If fill is almost black then set it to black
+			const colorInt = parseInt(fillColor.substr(1),16);
+			if(!Number.isNaN(colorInt)){
+				console.log(`color blackness: ${colorInt} - ${parseInt(colorInt)/16777215} %`);
+				if(colorInt/16777215 < 0.08){
+					console.log(`Setting fill color from ${fillColor} to full black`);
+					newFillColor = '#000000';
+				
+				}  // #040404 = 16514043
+			}
+			
+
+			if(path.$?.fill === 'none'){
+				path.$.fill = null;
+			} else{
+				path.$.fill = newFillColor;
+			}
+			
+			
+			
+		}
+		
+		// All strokes must be black only (developer requirement!)
+        if (path.$?.stroke) {
+          console.log('Set stroke="black" attribute for <path> tag');
+          path.$.stroke = 'black';
+        }
+		
+
       });
 	  
 	  console.log(`Path count: ${svg.path.length}`);
